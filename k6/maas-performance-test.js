@@ -9,6 +9,12 @@ const CLUSTER_DOMAIN = __ENV.CLUSTER_DOMAIN || "";
 const HOST = __ENV.HOST || `maas.${CLUSTER_DOMAIN}`;
 const PROTOCOL = __ENV.PROTOCOL || "http";
 const MODEL_NAME = __ENV.MODEL_NAME || "";
+// Base path before model name in URL (default: maas-benchmarking). Full path: /${MODEL_BASE_PATH}/${model}/v1/completions
+const MODEL_BASE_PATH = __ENV.MODEL_BASE_PATH || "maas-benchmarking";
+// Model id sent in request body (some backends expect e.g. "facebook/opt-125m" for simulator)
+const MODEL_PAYLOAD_ID = __ENV.MODEL_PAYLOAD_ID || MODEL_NAME || "default-model";
+// Subscription header required by MaaS gateway (e.g. maas-benchmark-subscription)
+const MAAS_SUBSCRIPTION_HEADER = __ENV.MAAS_SUBSCRIPTION_HEADER || "maas-benchmark-subscription";
 const MODE = __ENV.MODE || "burst"; // "burst" | "soak" | "rate-limit-test"
 
 // Burst configuration
@@ -184,25 +190,28 @@ function getRandomToken(tier) {
 
 function buildModelUrl(modelName) {
     if (modelName) {
-        // Transform model name for URL: facebook/opt-125m -> facebook-opt-125m-simulated
-        const urlModelName = modelName.replace(/\//g, "-") + "-simulated";
-        return `${PROTOCOL}://${HOST}/llm/${urlModelName}/v1/chat/completions`;
+        // Transform for URL: facebook/opt-125m -> facebook-opt-125m-simulated; already MaaSModel name (e.g. facebook-opt-125m-simulated) left as-is
+        const base = modelName.replace(/\//g, "-");
+        const urlModelName = base.endsWith("-simulated") ? base : base + "-simulated";
+        return `${PROTOCOL}://${HOST}/${MODEL_BASE_PATH}/${urlModelName}/v1/completions`;
     }
-    return `${PROTOCOL}://${HOST}/v1/chat/completions`;
+    return `${PROTOCOL}://${HOST}/${MODEL_BASE_PATH}/v1/completions`;
 }
 
 function makeInferenceRequest(token, prompt, maxTokens, tier) {
     const modelUrl = buildModelUrl(MODEL_NAME);
 
+    // /v1/completions format: model, prompt, max_tokens (required by MaaS gateway)
     const payload = JSON.stringify({
-        model: MODEL_NAME || "default-model",
+        model: MODEL_PAYLOAD_ID,
         prompt: prompt,
         max_tokens: maxTokens
     });
 
     const headers = {
         "Authorization": `Bearer ${token.token}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-maas-subscription": MAAS_SUBSCRIPTION_HEADER
     };
 
     const response = http.post(modelUrl, payload, {
