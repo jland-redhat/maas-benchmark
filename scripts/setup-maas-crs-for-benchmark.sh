@@ -18,6 +18,7 @@
 #   BENCH_SA_NAMESPACE   Namespace where benchmark SAs live (default: maas-benchmark)
 #   BENCH_MODEL_NAMESPACE Namespace where LLMIS (simulator) is installed (default: maas-benchmarking)
 #   MODEL_NAMES          Comma-separated MaaSModel names (default: facebook-opt-125m-simulated)
+#   MODEL_BASE_PATH     URL path before model name for validation (default: maas-benchmarking). Set to llm if gateway uses /llm.
 #   TOKEN_LIMIT          Token rate limit per user per model (default: 100000)
 #   TOKEN_WINDOW         Rate limit window (default: 1m)
 #   TOKEN_FILE           Path to all_tokens.json (default: tokens/all/all_tokens.json)

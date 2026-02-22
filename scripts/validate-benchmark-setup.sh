@@ -4,7 +4,7 @@
 # 1. Auth validation: no token -> 401, invalid token -> 401, valid token -> 2xx
 # 2. Rate-limit validation: temporarily lower token limit, make requests until 429, restore limit
 #
-# Environment: HOST, PROTOCOL (http/https), MAAS_CR_NAMESPACE, TOKEN_FILE, MODEL_NAMES (first used for URL)
+# Environment: HOST, PROTOCOL (http/https), MODEL_BASE_PATH (default: maas-benchmarking), MAAS_CR_NAMESPACE, TOKEN_FILE, MODEL_NAMES (first used for URL)
 
 set -euo pipefail
 
