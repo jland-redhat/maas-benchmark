@@ -57,7 +57,7 @@ let tokens = { free: [], premium: [] };
 // Load tokens from file or use sample data
 function loadTokens() {
     if (USE_SAMPLE_TOKENS) {
-        // Generate sample tokens for testing without provisioned tokens
+        // Generate sample API keys for testing without provisioned keys
         console.log("Using sample tokens for testing");
         for (let i = 1; i <= SAMPLE_SIZE; i++) {
             tokens.free.push({
@@ -80,7 +80,7 @@ function loadTokens() {
             console.log(`Loaded ${tokens.free.length} free tokens and ${tokens.premium.length} premium tokens`);
         } catch (error) {
             console.error(`Failed to load tokens from ${TOKEN_FILE_PATH}: ${error}`);
-            console.log("Run 'scripts/provision-tokens.sh' first or set USE_SAMPLE_TOKENS=true");
+            console.log("Run 'scripts/provision-api-keys.sh' first or set USE_SAMPLE_TOKENS=true for testing");
             throw new Error("Token loading failed");
         }
     }

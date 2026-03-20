@@ -387,7 +387,7 @@ print_summary() {
     log_success "MaaS deployment validation completed successfully!"
     echo ""
     echo "The deployment is ready for benchmarking. You can now:"
-    echo "  1. Run './provision-tokens.sh' to generate 500 user tokens"
+    echo "  1. Run './provision-api-keys.sh' to generate 500 API keys"
     echo "  2. Execute k6 performance tests using the generated tokens"
 }
 

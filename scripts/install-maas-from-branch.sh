@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # install-maas-from-branch.sh - Install MaaS controller and examples from a feature branch
 #
-# Use this to run benchmarks against the new MaaS CRs (MaaSModel, MaaSAuthPolicy,
-# MaaSSubscription) from a specific branch of the models-as-a-service repo (e.g.
-# feature/maas-subscription-redesign).
+# Use this to run benchmarks against the MaaS CRs (MaaSModelRef, MaaSAuthPolicy,
+# MaaSSubscription) from a specific branch of the models-as-a-service repo.
 #
 # Prerequisites: oc/kubectl, cluster with Gateway API and Kuadrant. The shared
 # gateway-auth-policy in openshift-ingress should be disabled before using
@@ -79,11 +78,11 @@ if [[ -n "${SKIP_EXAMPLES:-}" ]]; then
 else
   log_info "Installing example MaaS CRs and simulator LLMInferenceServices..."
   REPO_PARENT="$MAAS_REPO_PATH" "${CONTROLLER_DIR}/scripts/install-examples.sh" || {
-    log_warn "install-examples.sh failed; you may need to create MaaSModel/MaaSAuthPolicy/MaaSSubscription and models manually"
+    log_warn "install-examples.sh failed; you may need to create MaaSModelRef/MaaSAuthPolicy/MaaSSubscription and models manually"
   }
 fi
 
 log_info "Done. Next steps:"
-log_info "  1. Create benchmark SAs and tokens: MAAS_CR_MODE=true FREE_USERS=10 ./scripts/create-sa-tokens.sh"
+log_info "  1. Create benchmark API keys:      FREE_USERS=10 ./scripts/provision-api-keys.sh"
 log_info "  2. Create benchmark MaaS CRs:      ./scripts/setup-maas-crs-for-benchmark.sh"
 log_info "  3. Run k6: HOST=maas.<cluster-domain> MODEL_NAME=facebook-opt-125m-simulated k6 run k6/maas-performance-test.js"

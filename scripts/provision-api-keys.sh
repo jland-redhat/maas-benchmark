@@ -1,20 +1,19 @@
 #!/bin/bash
 
-# provision-tokens.sh - Provision service account tokens for benchmarking
+# provision-api-keys.sh - Provision API keys for benchmarking
 set -euo pipefail
 
 # Configuration
 CLUSTER_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null || echo "")
 HOST="maas.${CLUSTER_DOMAIN}"
 PROTOCOL="https"
-TOKEN_EXPIRATION=${TOKEN_EXPIRATION:-"1h"}
+TOKEN_EXPIRATION=${TOKEN_EXPIRATION:-"4h"}
 FREE_USERS=${FREE_USERS:-3}
 PREMIUM_USERS=${PREMIUM_USERS:-3}
-USER_PASSWORD=${USER_PASSWORD:-"benchmarkuser123"}
 
 # No need to save context since we're using the current user
 
-echo "Starting MaaS token provisioning..."
+echo "Starting MaaS API key provisioning..."
 echo "Host: $HOST"
 echo "Free users: $FREE_USERS, Premium users: $PREMIUM_USERS"
 
@@ -22,16 +21,16 @@ echo "Free users: $FREE_USERS, Premium users: $PREMIUM_USERS"
 mkdir -p tokens/{free,premium,all}
 rm -f tokens/free/*.json tokens/premium/*.json tokens/all/*.json
 
-# Simple token provisioning using current user
+# API key provisioning using current user
 
-# Provision tokens for benchmarking
-echo "Provisioning tokens for benchmarking..."
+# Provision API keys for benchmarking
+echo "Provisioning API keys for benchmarking..."
 success_count=0
 failure_count=0
 TOTAL_TOKENS=$((FREE_USERS + PREMIUM_USERS))
 
 echo "Current OpenShift user: $(oc whoami)"
-echo "Creating $TOTAL_TOKENS tokens..."
+echo "Creating $TOTAL_TOKENS API keys..."
 
 # Get user's token once
 USER_TOKEN=$(oc whoami -t)
@@ -44,7 +43,7 @@ i=1
 while [ $i -le $TOTAL_TOKENS ]; do
     user_id="benchuser${i}"
 
-    echo "Token $i/$TOTAL_TOKENS: $user_id"
+    echo "API key $i/$TOTAL_TOKENS: $user_id"
 
     response=$(curl -sSk \
         -w "\n%{http_code}" \
@@ -52,16 +51,27 @@ while [ $i -le $TOTAL_TOKENS ]; do
         -H "Authorization: Bearer ${USER_TOKEN}" \
         -H "Content-Type: application/json" \
         -X POST \
-        -d '{"expiration": "'${TOKEN_EXPIRATION}'"}' \
-        "${PROTOCOL}://${HOST}/maas-api/v1/tokens")
+        -d '{"name": "'${user_id}'", "expiresIn": "'${TOKEN_EXPIRATION}'"}' \
+        "${PROTOCOL}://${HOST}/maas-api/v1/api-keys")
 
     http_code=$(echo "$response" | tail -n1)
-    response_body=$(echo "$response" | head -n -1)
+    response_body=$(echo "$response" | sed '$d')
 
     if [[ "$http_code" -ge 200 && "$http_code" -lt 300 ]]; then
+        # Extract token and key_id
+        token=$(echo "$response_body" | jq -r '.key')
+        key_id=$(echo "$response_body" | jq -r '.id')
+        
         # Save token to free directory (since we don't care about tiers for this test)
         output_file="tokens/free/${user_id}.json"
-        echo "$response_body" | jq --arg user "$user_id" '. + {user_id: $user}' > "$output_file"
+        cat > "$output_file" <<EOF
+{
+    "user_id": "$user_id",
+    "token": "$token",
+    "tier": "free",
+    "key_id": "$key_id"
+}
+EOF
         echo "SUCCESS: $user_id"
         success_count=$((success_count + 1))
     else
@@ -73,7 +83,7 @@ while [ $i -le $TOTAL_TOKENS ]; do
     i=$((i + 1))
 done
 
-echo "Token provisioning complete: $success_count successful, $failure_count failed"
+echo "API key provisioning complete: $success_count successful, $failure_count failed"
 
 # No context restoration needed
 

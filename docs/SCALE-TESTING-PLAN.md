@@ -71,17 +71,17 @@ cd ~/maas-bench/maas-benchmarking
 **Goal**: Determine maximum concurrent users before degradation
 
 ### Theory
-- Each concurrent user (VU in k6) simulates a user making requests
-- More VUs = more parallel TokenReview validations at the gateway
+- Each concurrent user (VU in k6) simulates a user making requests with API keys
+- More VUs = more parallel API key validations at the gateway
 - Looking for: increased latency, error rate, or timeouts
 
 ### Setup
 ```bash
-# Create tokens for testing (start with 50, scale up as needed)
-FREE_USERS=50 ./scripts/create-sa-tokens.sh
+# Create API keys for testing (start with 50, scale up as needed)
+FREE_USERS=50 ./scripts/provision-api-keys.sh
 
 # Verify tokens created
-./scripts/token-manager.sh status
+./scripts/api-key-manager.sh status
 ```
 
 ### Test Execution
@@ -118,9 +118,9 @@ k6 run -e MODE="burst" -e BURST_ITERATIONS=500 -e BURST_VUS=50 \
 
 #### Phase 3: High Scale (if cluster supports)
 ```bash
-# Create more tokens if needed
-FREE_USERS=100 ./scripts/cleanup-sa-tokens.sh
-FREE_USERS=100 ./scripts/create-sa-tokens.sh
+# Create more API keys if needed
+FREE_USERS=100 ./scripts/cleanup-api-keys.sh
+FREE_USERS=100 ./scripts/provision-api-keys.sh
 
 # 100 VUs
 k6 run -e MODE="burst" -e BURST_ITERATIONS=1000 -e BURST_VUS=100 \
@@ -149,13 +149,13 @@ k6 run -e MODE="burst" -e BURST_ITERATIONS=1000 -e BURST_VUS=100 \
 
 ### Theory
 - Sustained high request rate stresses all components
-- TokenReview, Authorino, Limitador, Model Server all under load
+- API key validation, Authorino, Limitador, Model Server all under load
 - Looking for: queue buildup, timeout errors, 5xx responses
 
 ### Setup
 ```bash
-# Ensure tokens exist
-FREE_USERS=20 ./scripts/create-sa-tokens.sh
+# Ensure API keys exist
+FREE_USERS=20 ./scripts/provision-api-keys.sh
 ```
 
 ### Test Execution
@@ -205,16 +205,16 @@ k6 run -e MODE="soak" -e SOAK_DURATION="2m" -e SOAK_RATE_FREE=100 \
 **Goal**: Test if large numbers of active tokens degrade performance
 
 ### Theory
-- More service accounts = more entries in etcd
-- More tokens = potentially more TokenReview cache pressure
+- More API keys = more entries in the database
+- More tokens = potentially more validation pressure
 - Looking for: degradation as token count increases
 
 ### Setup & Execution
 
 #### Phase 1: Baseline with 10 Tokens
 ```bash
-FREE_USERS=10 ./scripts/cleanup-sa-tokens.sh
-FREE_USERS=10 ./scripts/create-sa-tokens.sh
+FREE_USERS=10 ./scripts/cleanup-api-keys.sh
+FREE_USERS=10 ./scripts/provision-api-keys.sh
 
 CLUSTER_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
 
@@ -226,36 +226,36 @@ k6 run -e MODE="burst" -e BURST_ITERATIONS=100 -e BURST_VUS=10 \
 #### Phase 2: Scale Token Volume
 ```bash
 # 50 tokens
-FREE_USERS=50 ./scripts/cleanup-sa-tokens.sh
-FREE_USERS=50 ./scripts/create-sa-tokens.sh
+FREE_USERS=50 ./scripts/cleanup-api-keys.sh
+FREE_USERS=50 ./scripts/provision-api-keys.sh
 k6 run -e MODE="burst" -e BURST_ITERATIONS=100 -e BURST_VUS=10 \
   -e HOST="maas.${CLUSTER_DOMAIN}" -e PROTOCOL="https" -e MODEL_NAME="facebook/opt-125m" \
   --summary-export=results/tokens_50.json k6/maas-performance-test.js
 
 # 100 tokens
-FREE_USERS=100 ./scripts/cleanup-sa-tokens.sh
-FREE_USERS=100 ./scripts/create-sa-tokens.sh
+FREE_USERS=100 ./scripts/cleanup-api-keys.sh
+FREE_USERS=100 ./scripts/provision-api-keys.sh
 k6 run -e MODE="burst" -e BURST_ITERATIONS=100 -e BURST_VUS=10 \
   -e HOST="maas.${CLUSTER_DOMAIN}" -e PROTOCOL="https" -e MODEL_NAME="facebook/opt-125m" \
   --summary-export=results/tokens_100.json k6/maas-performance-test.js
 
 # 250 tokens
-FREE_USERS=250 ./scripts/cleanup-sa-tokens.sh
-FREE_USERS=250 ./scripts/create-sa-tokens.sh
+FREE_USERS=250 ./scripts/cleanup-api-keys.sh
+FREE_USERS=250 ./scripts/provision-api-keys.sh
 k6 run -e MODE="burst" -e BURST_ITERATIONS=100 -e BURST_VUS=10 \
   -e HOST="maas.${CLUSTER_DOMAIN}" -e PROTOCOL="https" -e MODEL_NAME="facebook/opt-125m" \
   --summary-export=results/tokens_250.json k6/maas-performance-test.js
 
 # 500 tokens
-FREE_USERS=500 ./scripts/cleanup-sa-tokens.sh
-FREE_USERS=500 ./scripts/create-sa-tokens.sh
+FREE_USERS=500 ./scripts/cleanup-api-keys.sh
+FREE_USERS=500 ./scripts/provision-api-keys.sh
 k6 run -e MODE="burst" -e BURST_ITERATIONS=100 -e BURST_VUS=10 \
   -e HOST="maas.${CLUSTER_DOMAIN}" -e PROTOCOL="https" -e MODEL_NAME="facebook/opt-125m" \
   --summary-export=results/tokens_500.json k6/maas-performance-test.js
 ```
 
 ### Metrics to Record
-| Active Tokens | SA Creation Time | p50 Latency | p95 Latency | Success Rate |
+| Active Tokens | Key Creation Time | p50 Latency | p95 Latency | Success Rate |
 |---------------|------------------|-------------|-------------|--------------|
 | 10            |                  |             |             |              |
 | 50            |                  |             |             |              |
@@ -266,7 +266,7 @@ k6 run -e MODE="burst" -e BURST_ITERATIONS=100 -e BURST_VUS=10 \
 ### Success Criteria
 - **No Impact**: Latency consistent across all token volumes
 - **Degradation**: Latency increases with token count
-- **Breaking**: Significant degradation or SA creation failures
+- **Breaking**: Significant degradation or API key creation failures
 
 ---
 
@@ -319,8 +319,8 @@ done
 ## Cleanup
 
 ```bash
-# Remove test service accounts
-FREE_USERS=500 ./scripts/cleanup-sa-tokens.sh
+# Remove test API keys
+FREE_USERS=500 ./scripts/cleanup-api-keys.sh
 
 # Restore original rate limits
 # RateLimitPolicy (5/20/50 requests per 2 min)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# token-manager.sh - Manage tokens for MaaS benchmarking
+# api-key-manager.sh - Manage API keys for MaaS benchmarking
 # Provides utilities for token validation, refresh, and cleanup
 
 set -euo pipefail
@@ -197,10 +197,10 @@ validate_tokens() {
 # Refresh expired tokens
 refresh_tokens() {
     log_info "Token refresh functionality"
-    log_warn "Token refresh requires re-running the provision-tokens.sh script"
+    log_warn "Token refresh requires re-running the provision-api-keys.sh script"
     echo ""
     echo "To refresh tokens:"
-    echo "  1. Run: ./provision-tokens.sh"
+    echo "  1. Run: ./provision-api-keys.sh"
     echo "  2. This will generate new tokens for all users"
     echo ""
     echo "Note: In the service account architecture, tokens are automatically"
@@ -243,7 +243,7 @@ clean_all_tokens() {
         rm -f "${TOKEN_DIR}/all"/*.txt 2>/dev/null || true
 
         log_success "All token files removed"
-        log_info "Run './scripts/provision-tokens.sh' to generate new tokens"
+        log_info "Run './scripts/provision-api-keys.sh' to generate new API keys"
     else
         log_info "Operation cancelled"
     fi
