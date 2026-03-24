@@ -123,7 +123,7 @@ fi
 
 echo ""
 log_info "Test users created successfully!"
-log_info "You can now provision tokens using: ./scripts/provision-tokens.sh"
+log_info "You can now provision API keys using: ./scripts/provision-api-keys.sh"
 log_info ""
 log_info "Note: It may take 1-2 minutes for the OAuth pods to fully restart."
 log_info "      If token provisioning fails, wait a bit and try again."

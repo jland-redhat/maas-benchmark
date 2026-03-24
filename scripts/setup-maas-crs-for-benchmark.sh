@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
 # setup-maas-crs-for-benchmark.sh - Create MaaSSubscription and MaaSAuthPolicy for benchmark users
 #
-# Uses the MaaS CRs from models-as-a-service (MaaSModel, MaaSAuthPolicy, MaaSSubscription).
+# Uses the MaaS CRs from models-as-a-service (MaaSModelRef, MaaSAuthPolicy, MaaSSubscription).
 # Reads benchmark users from tokens/all/all_tokens.json and creates CRs so each
-# service account has access to the specified model(s) with the given token rate limits.
+# user has access to the specified model(s) with the given token rate limits.
 #
 # Prerequisites:
 #   - maas-controller installed (e.g. from models-as-a-service)
-#   - MaaSModel(s) already exist for the model names you use
-#   - Run create-sa-tokens.sh first (with MAAS_CR_MODE=true to use benchmark namespace)
+#   - MaaSModelRef(s) already exist for the model names you use
+#   - Run provision-api-keys.sh first to create API keys
 #
 # Usage:
 #   ./scripts/setup-maas-crs-for-benchmark.sh
 #
 # Environment:
-#   MAAS_CR_NAMESPACE     Namespace for MaaS CRs - MaaSModel, MaaSAuthPolicy, MaaSSubscription (default: opendatahub)
-#   BENCH_SA_NAMESPACE   Namespace where benchmark SAs live (default: maas-benchmark)
+#   MAAS_CR_NAMESPACE     Namespace for MaaS CRs - MaaSModelRef, MaaSAuthPolicy, MaaSSubscription (default: opendatahub)
 #   BENCH_MODEL_NAMESPACE Namespace where LLMIS (simulator) is installed (default: maas-benchmarking)
-#   MODEL_NAMES          Comma-separated MaaSModel names (default: facebook-opt-125m-simulated)
+#   MODEL_NAMES          Comma-separated MaaSModelRef names (default: facebook-opt-125m-simulated)
 #   MODEL_BASE_PATH     URL path before model name for validation (default: maas-benchmarking). Set to llm if gateway uses /llm.
 #   TOKEN_LIMIT          Token rate limit per user per model (default: 100000)
 #   TOKEN_WINDOW         Rate limit window (default: 1m)
 #   TOKEN_FILE           Path to all_tokens.json (default: tokens/all/all_tokens.json)
 #   MAAS_REPO_PATH       Path to models-as-a-service repo for installing simulator (default: ../models-as-a-service)
-#   SKIP_MODEL_INSTALL   If set, do not install LLMIS or MaaSModel if missing
+#   SKIP_MODEL_INSTALL   If set, do not install LLMIS or MaaSModelRef if missing
 #   SKIP_WAIT            If set, do not wait for CRs to reconcile
 #   SKIP_VALIDATE        If set, do not run auth and rate-limit validation tests
 
@@ -41,7 +40,6 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 MAAS_CR_NAMESPACE="${MAAS_CR_NAMESPACE:-opendatahub}"
-BENCH_SA_NAMESPACE="${BENCH_SA_NAMESPACE:-maas-benchmark}"
 BENCH_MODEL_NAMESPACE="${BENCH_MODEL_NAMESPACE:-maas-benchmarking}"
 MODEL_NAMES="${MODEL_NAMES:-facebook-opt-125m-simulated}"
 TOKEN_LIMIT="${TOKEN_LIMIT:-100000}"
@@ -54,7 +52,7 @@ BENCH_SUBSCRIPTION_NAME="maas-benchmark-subscription"
 
 if [[ ! -f "$TOKEN_FILE" ]]; then
   log_error "Token file not found: $TOKEN_FILE"
-  log_info "Run create-sa-tokens.sh first (with MAAS_CR_MODE=true for MaaS CR mode)"
+  log_info "Run provision-api-keys.sh first to create API keys"
   exit 1
 fi
 
@@ -64,40 +62,40 @@ if ! kubectl get namespace "$MAAS_CR_NAMESPACE" &>/dev/null; then
   kubectl create namespace "$MAAS_CR_NAMESPACE"
 fi
 
-# Install LLMIS in BENCH_MODEL_NAMESPACE (maas-benchmarking) and MaaSModel in MAAS_CR_NAMESPACE (opendatahub) if missing
+# Install LLMIS in BENCH_MODEL_NAMESPACE (maas-benchmarking) and MaaSModelRef in MAAS_CR_NAMESPACE (opendatahub) if missing
 ensure_model_and_maas_model() {
   local model_name="$1"
-  if kubectl get maasmodel "$model_name" -n "$MAAS_CR_NAMESPACE" &>/dev/null; then
-    log_info "MaaSModel $model_name already exists in $MAAS_CR_NAMESPACE"
+  if kubectl get maasmodelref "$model_name" -n "$MAAS_CR_NAMESPACE" &>/dev/null; then
+    log_info "MaaSModelRef $model_name already exists in $MAAS_CR_NAMESPACE"
     return 0
   fi
   if [[ -n "${SKIP_MODEL_INSTALL:-}" ]]; then
-    log_warn "MaaSModel $model_name not found; SKIP_MODEL_INSTALL set. Create it manually."
+    log_warn "MaaSModelRef $model_name not found; SKIP_MODEL_INSTALL set. Create it manually."
     return 1
   fi
   if [[ "$model_name" != "facebook-opt-125m-simulated" ]]; then
-    log_warn "Auto-install only supports facebook-opt-125m-simulated. Create MaaSModel $model_name manually."
+    log_warn "Auto-install only supports facebook-opt-125m-simulated. Create MaaSModelRef $model_name manually."
     return 1
   fi
   if [[ ! -d "$MAAS_REPO_PATH" ]]; then
-    log_error "MAAS_REPO_PATH not found: $MAAS_REPO_PATH. Set it or create MaaSModel manually."
+    log_error "MAAS_REPO_PATH not found: $MAAS_REPO_PATH. Set it or create MaaSModelRef manually."
     return 1
   fi
   local models_dir="${MAAS_REPO_PATH}/docs/samples/models/simulator"
   if [[ ! -d "$models_dir" ]]; then
-    log_error "Simulator not found at $models_dir. Set MAAS_REPO_PATH or create MaaSModel manually."
+    log_error "Simulator not found at $models_dir. Set MAAS_REPO_PATH or create MaaSModelRef manually."
     return 1
   fi
-  log_info "Installing LLMInferenceService (simulator) in $BENCH_MODEL_NAMESPACE and MaaSModel in $MAAS_CR_NAMESPACE..."
+  log_info "Installing LLMInferenceService (simulator) in $BENCH_MODEL_NAMESPACE and MaaSModelRef in $MAAS_CR_NAMESPACE..."
   kubectl get namespace "$BENCH_MODEL_NAMESPACE" &>/dev/null || kubectl create namespace "$BENCH_MODEL_NAMESPACE"
   # Simulator kustomization uses namespace: llm; override to BENCH_MODEL_NAMESPACE so LLMIS is in maas-benchmarking
   (cd "$MAAS_REPO_PATH" && kustomize build "docs/samples/models/simulator") | \
     sed "s/namespace: llm/namespace: $BENCH_MODEL_NAMESPACE/g" | \
     kubectl apply -f -
-  # MaaSModel lives in MAAS_CR_NAMESPACE (opendatahub) and points at LLMIS in BENCH_MODEL_NAMESPACE (maas-benchmarking)
+  # MaaSModelRef lives in MAAS_CR_NAMESPACE (opendatahub) and points at LLMIS in BENCH_MODEL_NAMESPACE (maas-benchmarking)
   kubectl apply -f - <<EOF
 apiVersion: maas.opendatahub.io/v1alpha1
-kind: MaaSModel
+kind: MaaSModelRef
 metadata:
   name: $model_name
   namespace: $MAAS_CR_NAMESPACE
@@ -109,7 +107,7 @@ spec:
     name: $model_name
     namespace: $BENCH_MODEL_NAMESPACE
 EOF
-  log_info "Installed LLMIS in $BENCH_MODEL_NAMESPACE and MaaSModel $model_name in $MAAS_CR_NAMESPACE"
+  log_info "Installed LLMIS in $BENCH_MODEL_NAMESPACE and MaaSModelRef $model_name in $MAAS_CR_NAMESPACE"
 }
 
 for name in ${MODEL_NAMES//,/ }; do
@@ -117,16 +115,14 @@ for name in ${MODEL_NAMES//,/ }; do
   ensure_model_and_maas_model "$name" || true
 done
 
-# Build list of users: system:serviceaccount:${BENCH_SA_NAMESPACE}:${user_id}
-# Token JSON may have "namespace" (MaaS CR mode) or we use BENCH_SA_NAMESPACE
+# Build list of users: username from API key authentication
 users=()
 while IFS= read -r line; do
   [[ -z "$line" ]] && continue
   users+=("$line")
-done < <(jq -r --arg ns "$BENCH_SA_NAMESPACE" '
+done < <(jq -r '
   ([.free // [], .premium // []] | add[])
-  | (if .namespace then .namespace else $ns end) as $n
-  | "system:serviceaccount:\($n):\(.user_id)"
+  | .user_id
 ' "$TOKEN_FILE" 2>/dev/null)
 
 if [[ ${#users[@]} -eq 0 ]]; then
@@ -214,13 +210,13 @@ if [[ -z "${SKIP_WAIT:-}" ]]; then
   for name in ${MODEL_NAMES//,/ }; do
     name=$(echo "$name" | tr -d ' ')
     for i in 1 2 3 4 5 6 7 8 9 10; do
-      phase=$(kubectl get maasmodel "$name" -n "$MAAS_CR_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+      phase=$(kubectl get maasmodelref "$name" -n "$MAAS_CR_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
       [[ "$phase" == "Ready" ]] && break
-      log_info "  MaaSModel $name phase=$phase (attempt $i/10)"
+      log_info "  MaaSModelRef $name phase=$phase (attempt $i/10)"
       sleep 5
     done
-    phase=$(kubectl get maasmodel "$name" -n "$MAAS_CR_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-    [[ "$phase" != "Ready" ]] && log_warn "MaaSModel $name did not become Ready (phase=$phase)"
+    phase=$(kubectl get maasmodelref "$name" -n "$MAAS_CR_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    [[ "$phase" != "Ready" ]] && log_warn "MaaSModelRef $name did not become Ready (phase=$phase)"
   done
   for i in 1 2 3 4 5 6 7 8 9 10; do
     ap_phase=$(kubectl get maasauthpolicy "$BENCH_AUTH_POLICY_NAME" -n "$MAAS_CR_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")

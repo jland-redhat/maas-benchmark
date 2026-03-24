@@ -191,7 +191,7 @@ check_tokens() {
     if [ ! -f "$token_file" ]; then
         log_warn "Token file not found: $token_file"
         log_info "You can:"
-        echo "  1. Run '../scripts/provision-tokens.sh' to generate tokens"
+        echo "  1. Run '../scripts/provision-api-keys.sh' to generate API keys"
         echo "  2. Set USE_SAMPLE_TOKENS=true to use sample tokens for testing"
         echo ""
         read -p "Use sample tokens for this test? (y/N): " -n 1 -r
