@@ -175,6 +175,7 @@ export const options = {
         http_req_failed: ["rate<0.1"],     // Less than 10% failures
         success_rate: ["rate>0.9"],       // More than 90% success
     },
+    insecureSkipTLSVerify: true, // Skip TLS verification for self-signed certs
 };
 
 // ========================================

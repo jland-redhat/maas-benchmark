@@ -4,7 +4,15 @@
 - Authenticated to OpenShift: `oc login`
 - k6 installed
 - MaaS deployment running
-- etcd monitoring steps (Prometheus access + PromQL) are documented in `docs/ETCD-MONITORING.md`
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Load Testing Guide](docs/LOAD-TESTING-GUIDE.md) | Comprehensive load testing scenarios and analysis |
+| [Subscription Scale Testing](docs/SUBSCRIPTION-SCALE-TESTING.md) | Testing subscription count bottlenecks (1-100) |
+| [Scale Testing Plan](docs/SCALE-TESTING-PLAN.md) | Phased scale testing methodology |
+| [etcd Monitoring](docs/etcd-monitoring.md) | Prometheus queries for etcd metrics |
 
 ## API Keys and authentication
 
@@ -241,3 +249,49 @@ HOST=$HOST MODEL_NAME=$MODEL_NAME MODE=soak SOAK_DURATION=2m SOAK_RATE_FREE=5 k6
 # Create 50 API keys
 FREE_USERS=50 PREMIUM_USERS=0 ./scripts/provision-api-keys.sh
 ```
+
+---
+
+## Subscription Scale Testing
+
+Test how many MaaSSubscriptions the system can handle (up to **1000**) with **automatic bottleneck detection**.
+
+### Quick Start
+
+```bash
+# Full test: 1 → 10 → 25 → 50 → 100 → 150 → 200 → 300 → 400 → 500 → 750 → 1000
+# Automatically stops when bottleneck is detected
+./scripts/benchmark-subscription-scale.sh
+
+# Custom subscription counts
+SUBSCRIPTION_COUNTS="1 50 100 250 500 750 1000" ./scripts/benchmark-subscription-scale.sh
+
+# Continue testing past bottleneck
+STOP_ON_BOTTLENECK=false ./scripts/benchmark-subscription-scale.sh
+
+# Adjust bottleneck thresholds
+MAX_RECONCILE_TIME=600 MIN_SUCCESS_RATE=0.85 ./scripts/benchmark-subscription-scale.sh
+```
+
+### Bottleneck Detection
+
+The script automatically detects when:
+- **Reconciliation time** exceeds 5 minutes (`MAX_RECONCILE_TIME=300`)
+- **Success rate** drops below 90% (`MIN_SUCCESS_RATE=0.90`)
+- **p95 latency** exceeds 10 seconds (`MAX_P95_LATENCY=10000`)
+
+### Sample Output
+
+```
+| Subscriptions | Users | Reconcile (s) | p50 | p95 | Success | Status |
+|---------------|-------|---------------|-----|-----|---------|--------|
+| 100           | 300   | 68.45         | 178 | 389 | 97.8%   | ✅     |
+| 200           | 600   | 142.89        | 267 | 678 | 94.2%   | ✅     |
+| 300           | 900   | 218.34        | 345 | 892 | 91.3%   | ✅     |
+| 400           | 1200  | 312.56        | 456 | 1245| 88.5%   | 🚨     |
+
+🚨 BOTTLENECK DETECTED at 400 subscriptions
+Recommended safe limit: 300 subscriptions (with 80% buffer: 240)
+```
+
+See [docs/SUBSCRIPTION-SCALE-TESTING.md](docs/SUBSCRIPTION-SCALE-TESTING.md) for detailed documentation.

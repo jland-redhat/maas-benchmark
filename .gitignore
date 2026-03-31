@@ -2,6 +2,10 @@
 tokens/
 !tokens/.gitkeep
 
+# k6 benchmark results (auto-generated per run)
+results/**/k6_*.json
+results/**/*-benchmark-202*.md
+
 # Temporary files
 *.tmp
 *.log
