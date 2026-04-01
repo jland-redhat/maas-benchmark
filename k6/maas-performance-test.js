@@ -209,10 +209,20 @@ function makeInferenceRequest(token, prompt, maxTokens, tier) {
         max_tokens: maxTokens
     });
 
+    // Derive subscription header from user_id (e.g., "sub1-user1" -> "scale-benchmark-sub-1")
+    // If MAAS_SUBSCRIPTION_HEADER contains "scale-benchmark-sub-", derive from user_id
+    let subscriptionHeader = MAAS_SUBSCRIPTION_HEADER;
+    if (MAAS_SUBSCRIPTION_HEADER.includes("scale-benchmark-sub-") && token.user_id) {
+        const match = token.user_id.match(/^sub(\d+)-/);
+        if (match) {
+            subscriptionHeader = `scale-benchmark-sub-${match[1]}`;
+        }
+    }
+
     const headers = {
         "Authorization": `Bearer ${token.token}`,
         "Content-Type": "application/json",
-        "x-maas-subscription": MAAS_SUBSCRIPTION_HEADER
+        "x-maas-subscription": subscriptionHeader
     };
 
     const response = http.post(modelUrl, payload, {
@@ -252,7 +262,7 @@ function makeInferenceRequest(token, prompt, maxTokens, tier) {
 
     // Debug logging
     if (__ENV.DEBUG === "true") {
-        console.log(`[${tier}] ${token.user_id}: Status ${response.status}, URL: ${modelUrl}`);
+        console.log(`[${tier}] ${token.user_id}: Status ${response.status}, URL: ${modelUrl}, sub-header: ${subscriptionHeader}`);
         if (response.status !== 200) {
             console.log(`[${tier}] ${token.user_id}: Response body: ${response.body.substring(0, 200)}...`);
         }

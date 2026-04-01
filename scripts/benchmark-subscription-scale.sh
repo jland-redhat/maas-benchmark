@@ -290,6 +290,7 @@ metadata:
     app.kubernetes.io/part-of: subscription-scale-benchmark
     benchmark-subscription-index: "${s}"
 spec:
+  priority: 20
   owner:
     users:${users_yaml}
     groups: []
@@ -357,6 +358,13 @@ EOF
 run_k6_test() {
   local sub_count=$1
   local result_file="$RESULTS_DIR/k6_${sub_count}subs_${TIMESTAMP}.json"
+  
+  # Wait for rate limit counters to reset (default: 30s, set RATE_LIMIT_WAIT=0 to skip)
+  local rate_limit_wait="${RATE_LIMIT_WAIT:-30}"
+  if [[ "$rate_limit_wait" -gt 0 ]]; then
+    log_info "Waiting ${rate_limit_wait}s for rate limit counters to settle..."
+    sleep "$rate_limit_wait"
+  fi
   
   log_info "Running k6 load test with ${sub_count} subscriptions..."
   
